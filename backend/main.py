@@ -6,6 +6,8 @@ import os
 from dotenv import load_dotenv
 from twilio.twiml.messaging_response import MessagingResponse
 from twilio.twiml.voice_response import VoiceResponse, Gather
+import base64
+from tts_wrapper import get_google_tts
 
 load_dotenv()
 
@@ -142,41 +144,53 @@ async def process_audio(file: UploadFile = File(...), session_id: str = Form(...
     print(f"AI: {ai_text}")
 
     # 3. Generate Audio (TTS)
+    audio_content = None
     try:
-        response = client.audio.speech.create(
-            model="tts-1",
-            voice="alloy",
-            input=ai_text
-        )
-        
-        # Read the binary audio content
-        audio_content = response.content
-        # Encode to base64
-        audio_base64 = base64.b64encode(audio_content).decode('utf-8')
-        
-        return {
-            "user_text": user_text,
-            "ai_text": ai_text,
-            "audio_base64": audio_base64
-        }
+        audio_content = get_google_tts(ai_text, "en-US") 
     except Exception as e:
-        print(f"TTS Error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Google TTS Error: {e}. Falling back to OpenAI.")
+        # Fallback to OpenAI
+        try:
+             response = client.audio.speech.create(
+                model="tts-1",
+                voice="alloy",
+                input=ai_text
+            )
+             audio_content = response.content
+        except Exception as oe:
+             print(f"OpenAI TTS Error: {oe}")
+             raise HTTPException(status_code=500, detail=str(e))
+
+    # Encode to base64
+    audio_base64 = base64.b64encode(audio_content).decode('utf-8')
+    
+    return {
+        "user_text": user_text,
+        "ai_text": ai_text,
+        "audio_base64": audio_base64
+    }
 
 class TTSRequest(BaseModel):
     text: str
+    language: str = "en-US"
 
 @app.post("/tts")
 async def tts_endpoint(request: TTSRequest):
     try:
-        response = client.audio.speech.create(
-            model="tts-1",
-            voice="alloy",
-            input=request.text
-        )
-        return StreamingResponse(io.BytesIO(response.content), media_type="audio/mpeg")
+        audio_content = get_google_tts(request.text, request.language)
+        return StreamingResponse(io.BytesIO(audio_content), media_type="audio/mpeg")
     except Exception as e:
-        print(f"TTS Error: {e}")
+        print(f"Google TTS Error: {e}. Falling back to OpenAI.")
+        try:
+            response = client.audio.speech.create(
+                model="tts-1",
+                voice="alloy",
+                input=request.text
+            )
+            return StreamingResponse(io.BytesIO(response.content), media_type="audio/mpeg")
+        except Exception as oe:
+            print(f"OpenAI TTS Error: {oe}")
+            raise HTTPException(status_code=500, detail=str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
 from ai_agent import sheets

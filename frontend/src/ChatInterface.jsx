@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import axios from 'axios'
-import { Send, User, Bot, Loader2, Mic, MicOff, X, Volume2, Image as ImageIcon } from 'lucide-react'
+import { Send, User, Bot, Loader2, Mic, MicOff, X, Volume2, Image as ImageIcon, Globe } from 'lucide-react'
 import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition'
 
 function ChatInterface({ sessionId }) {
@@ -14,6 +14,7 @@ function ChatInterface({ sessionId }) {
     const [isSpeaking, setIsSpeaking] = useState(false)
     const [selectedImage, setSelectedImage] = useState(null)
     const [previewUrl, setPreviewUrl] = useState(null)
+    const [language, setLanguage] = useState('en-US')
     const fileInputRef = useRef(null)
 
     // Voice Recognition Hooks
@@ -40,7 +41,6 @@ function ChatInterface({ sessionId }) {
     // Handle Transcript Changes (Auto-submit logic)
     useEffect(() => {
         if (isVoiceMode && listening && transcript) {
-            // Debounce logic: If user stops speaking for 1.5 seconds, submit
             if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current)
 
             silenceTimerRef.current = setTimeout(() => {
@@ -63,7 +63,7 @@ function ChatInterface({ sessionId }) {
         if (file) {
             const reader = new FileReader()
             reader.onloadend = () => {
-                setSelectedImage(reader.result) // Base64 string
+                setSelectedImage(reader.result)
                 setPreviewUrl(URL.createObjectURL(file))
             }
             reader.readAsDataURL(file)
@@ -86,8 +86,6 @@ function ChatInterface({ sessionId }) {
         setMessages(prev => [...prev, { role: 'user', content: text }])
 
         try {
-            // Voice mode simply sends text for now, ignoring any selected image to keep flow simple
-            // unless we want to support "Select image -> Speak -> Send"
             const payload = {
                 message: text,
                 session_id: sessionId,
@@ -98,17 +96,13 @@ function ChatInterface({ sessionId }) {
             const aiText = chatRes.data.response
 
             setMessages(prev => [...prev, { role: 'assistant', content: aiText }])
-
-            // Clear image after sending
             clearImage()
-
-            // 2. Initial TTS
             await playTextToSpeech(aiText)
 
         } catch (error) {
             console.error("Error in voice flow:", error)
             setMessages(prev => [...prev, { role: 'assistant', content: "Sorry, I had trouble processing that." }])
-            if (isVoiceMode) SpeechRecognition.startListening({ continuous: true })
+            if (isVoiceMode) SpeechRecognition.startListening({ continuous: true, language: language })
         } finally {
             setIsLoading(false)
         }
@@ -117,7 +111,7 @@ function ChatInterface({ sessionId }) {
     const playTextToSpeech = async (text) => {
         try {
             setIsSpeaking(true)
-            const response = await axios.post('http://localhost:8000/tts', { text }, { responseType: 'blob' })
+            const response = await axios.post('http://localhost:8000/tts', { text, language }, { responseType: 'blob' })
             const url = URL.createObjectURL(response.data)
 
             if (audioUrl) URL.revokeObjectURL(audioUrl)
@@ -131,7 +125,7 @@ function ChatInterface({ sessionId }) {
                 // Resume listening after AI finishes
                 if (isVoiceMode) {
                     resetTranscript()
-                    SpeechRecognition.startListening({ continuous: true })
+                    SpeechRecognition.startListening({ continuous: true, language: language })
                 }
             }
 
@@ -139,8 +133,9 @@ function ChatInterface({ sessionId }) {
         } catch (e) {
             console.error("TTS Error", e)
             setIsSpeaking(false)
-            if (isVoiceMode) SpeechRecognition.startListening({ continuous: true })
+            if (isVoiceMode) SpeechRecognition.startListening({ continuous: true, language: language })
         }
+
     }
 
     const toggleVoiceMode = () => {
@@ -159,9 +154,19 @@ function ChatInterface({ sessionId }) {
         } else {
             setIsVoiceMode(true)
             resetTranscript()
-            SpeechRecognition.startListening({ continuous: true })
+            SpeechRecognition.startListening({ continuous: true, language: language })
         }
     }
+
+    // Restart listening if language changes while active
+    useEffect(() => {
+        if (isVoiceMode && !isSpeaking && !isLoading) {
+            SpeechRecognition.stopListening()
+            setTimeout(() => {
+                SpeechRecognition.startListening({ continuous: true, language: language })
+            }, 100)
+        }
+    }, [language])
 
     const sendMessage = async (e) => {
         e.preventDefault()
@@ -176,11 +181,7 @@ function ChatInterface({ sessionId }) {
 
         setMessages(prev => [
             ...prev,
-            {
-                role: 'user',
-                content: userMessage,
-                image: previewUrl
-            }
+            { role: 'user', content: userMessage, image: previewUrl }
         ])
 
         try {
@@ -199,6 +200,22 @@ function ChatInterface({ sessionId }) {
 
     return (
         <div className="chat-interface">
+            <div className="language-selector-bar">
+                <Globe size={16} />
+                <select
+                    value={language}
+                    onChange={(e) => setLanguage(e.target.value)}
+                    disabled={isVoiceMode}
+                    className="lang-select"
+                >
+                    <option value="en-US">English (US)</option>
+                    <option value="en-IN">English (India)</option>
+                    <option value="hi-IN">Hindi (हिंदी)</option>
+                    <option value="te-IN">Telugu (తెలుగు)</option>
+                    <option value="kn-IN">Kannada (ಕನ್ನಡ)</option>
+                </select>
+            </div>
+
             <div className="messages-container">
                 {messages.map((msg, index) => (
                     <div key={index} className={`message-wrapper ${msg.role}`}>
@@ -247,7 +264,8 @@ function ChatInterface({ sessionId }) {
                     ) : listening ? (
                         <div className="status recording">
                             <Mic className="pulse-icon" size={18} />
-                            <span>Listening... {transcript ? `"${transcript}"` : ''}</span>
+                            <span>Listening... ({language})</span>
+                            <div className="transcript-preview">{transcript}</div>
                         </div>
                     ) : (
                         <div className="status">Paused</div>
@@ -259,7 +277,6 @@ function ChatInterface({ sessionId }) {
                 </div>
             )}
 
-            {/* Image Preview Overlay */}
             {previewUrl && (
                 <div className="image-preview-bar">
                     <img src={previewUrl} alt="Preview" />

@@ -79,6 +79,13 @@ Your goal is to help customers place orders.
 6. Before placing the order, list the items in the cart and ask for confirmation.
 7. Only call 'confirm_and_place_order' when the user explicitly says "Yes" or "Confirm".
 8. Keep your responses concise and conversational (suitable for voice).
+9. **LANGUAGE SUPPORT**: Always reply in the same language the user speaks. Supports: English, Telugu, Kannada, Hindi.
+   - If user speaks Telugu, reply in Telugu.
+   - If user speaks Hindi, reply in Hindi.
+   - If user speaks Kannada, reply in Kannada.
+10. **SEARCH STRATEGY**: The inventory is in **ENGLISH**.
+    - If the user asks for an item in a regional language (e.g., "ఫ్యాన్" for Fan), you MUST translate the keyword to ENGLISH (e.g., "Fan") before calling `search_inventory`.
+    - Do NOT search using Telugu/Hindi script. Use English keywords only.
 """
 
 def get_agent_response(session_id, user_text, image_url=None):

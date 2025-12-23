@@ -7,3 +7,4 @@ oauth2client
 python-multipart
 requests
 twilio
+google-cloud-texttospeech

@@ -318,6 +318,40 @@ footer {
   align-items: flex-start;
 }
 
-.message-wrapper.user .message-content-col {
-  align-items: flex-end;
+/* Language Selector Styles */
+.language-selector-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 15px;
+  background: rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  color: #aaa;
+}
+
+.lang-select {
+  background: transparent;
+  border: none;
+  color: white;
+  font-size: 0.9rem;
+  outline: none;
+  cursor: pointer;
+  flex: 1;
+}
+
+.lang-select option {
+  background: #1e1e1e;
+  /* Dark background for options */
+  color: white;
+}
+
+.transcript-preview {
+  font-size: 0.8rem;
+  color: #aaa;
+  margin-left: 10px;
+  font-style: italic;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
 }

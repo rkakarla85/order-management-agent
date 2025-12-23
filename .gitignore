@@ -1,6 +1,27 @@
+# Secrets
 .env
-backend/venv
-backend/__pycache__
-frontend/node_modules
-backend/credentials.json
+**/.env
+**/credentials.json
+**/*credentials*.json
+**/*secret*.json
+
+# Dependencies
+node_modules/
+**/node_modules/
+venv/
+**/venv/
+.python-version
+
+# Python
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+
+# System
 .DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*

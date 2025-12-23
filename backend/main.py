@@ -5,6 +5,7 @@ import io
 import os
 from dotenv import load_dotenv
 from twilio.twiml.messaging_response import MessagingResponse
+from twilio.twiml.voice_response import VoiceResponse, Gather
 
 load_dotenv()
 
@@ -42,31 +43,94 @@ async def whatsapp_webhook(request: Request):
     
     return Response(content=str(twilio_resp), media_type="application/xml")
 
+@app.post("/voice")
+async def voice_webhook(request: Request):
+    """
+    Handle incoming Voice calls from Twilio
+    """
+    form_data = await request.form()
+    user_speech = form_data.get('SpeechResult')
+    call_sid = form_data.get('CallSid') # Use CallSid as unique session ID for the call
+    
+    resp = VoiceResponse()
+    
+    if not user_speech:
+        # Initial Greeting (Start of Call)
+        greeting = "Welcome to the Application. How can I help you place an order today?"
+        gather = Gather(input='speech', action='/voice', timeout=3, language='en-US')
+        gather.say(greeting)
+        resp.append(gather)
+    else:
+        # User spoke something, get AI response
+        print(f"Voice Input from {call_sid}: {user_speech}")
+        
+        # Get response from AI Agent
+        ai_reply = get_agent_response(call_sid, user_speech)
+        print(f"AI Voice Reply: {ai_reply}")
+        
+        # Respond and wait for next input
+        gather = Gather(input='speech', action='/voice', timeout=3, language='en-US')
+        gather.say(ai_reply)
+        resp.append(gather)
+        
+    # If the user doesn't say anything or the gather times out, we can loop or end.
+    # For now, let's redirect back to voice to keep the line open if they are silent (or you could hangup)
+    resp.redirect('/voice')
+    
+    return Response(content=str(resp), media_type="application/xml")
+
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 from pydantic import BaseModel
 
+from typing import Optional
+
 class ChatRequest(BaseModel):
     message: str
     session_id: str
+    image: Optional[str] = None # Base64 encoded image or URL
 
 @app.post("/chat")
 async def chat(request: ChatRequest):
-    ai_text = get_agent_response(request.session_id, request.message)
+    image_url = None
+    if request.image:
+        # If it's a raw base64 string without prefix, add it
+        if request.image.startswith("data:image"):
+             image_url = request.image
+        else:
+             # Assume it's a base64 string and prepend standard header or it's a URL
+             # For simplicity, we'll assume the frontend sends a data URL if it's an upload
+             image_url = request.image
+
+    ai_text = get_agent_response(request.session_id, request.message, image_url=image_url)
     return {"response": ai_text}
+
+import base64
 
 @app.post("/process-audio")
 async def process_audio(file: UploadFile = File(...), session_id: str = Form(...)):
     # 1. Transcribe Audio (STT)
     try:
-        # Save temp file because OpenAI client needs a file-like object with name or path
-        # But we can pass the file.file directly if it has a name
-        file.file.name = file.filename # Ensure it has a name for format detection
+        # Save to a temporary file instead of mutating file.file.name
+        import tempfile
+        import shutil
+
+        # Create a temp file with the same extension
+        suffix = os.path.splitext(file.filename)[1]
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            shutil.copyfileobj(file.file, tmp)
+            tmp_path = tmp.name
         
-        transcript = client.audio.transcriptions.create(
-            model="whisper-1", 
-            file=file.file
-        )
+        # Open the temp file for reading
+        with open(tmp_path, "rb") as audio_file:
+            transcript = client.audio.transcriptions.create(
+                model="whisper-1", 
+                file=audio_file
+            )
+        
+        # Cleanup
+        os.remove(tmp_path)
+        
         user_text = transcript.text
         print(f"User: {user_text}")
     except Exception as e:
@@ -85,7 +149,31 @@ async def process_audio(file: UploadFile = File(...), session_id: str = Form(...
             input=ai_text
         )
         
-        # Stream the audio back
+        # Read the binary audio content
+        audio_content = response.content
+        # Encode to base64
+        audio_base64 = base64.b64encode(audio_content).decode('utf-8')
+        
+        return {
+            "user_text": user_text,
+            "ai_text": ai_text,
+            "audio_base64": audio_base64
+        }
+    except Exception as e:
+        print(f"TTS Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+class TTSRequest(BaseModel):
+    text: str
+
+@app.post("/tts")
+async def tts_endpoint(request: TTSRequest):
+    try:
+        response = client.audio.speech.create(
+            model="tts-1",
+            voice="alloy",
+            input=request.text
+        )
         return StreamingResponse(io.BytesIO(response.content), media_type="audio/mpeg")
     except Exception as e:
         print(f"TTS Error: {e}")

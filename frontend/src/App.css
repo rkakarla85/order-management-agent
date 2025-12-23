@@ -174,3 +174,150 @@ footer {
   font-size: 0.8rem;
   color: #666;
 }
+
+/* Voice Mode Styles */
+.voice-status-bar {
+  background: rgba(0, 0, 0, 0.4);
+  padding: 10px 15px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 0.9rem;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.status.recording {
+  color: #ff4757;
+}
+
+.status.speaking {
+  color: #2ed573;
+}
+
+.status.processing {
+  color: #eccc68;
+}
+
+.voice-toggle-btn.active {
+  background: #ff4757 !important;
+  color: white;
+}
+
+.stop-rec-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  color: white;
+  margin-left: 10px;
+}
+
+.stop-rec-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.exit-voice-btn {
+  background: transparent;
+  border: none;
+  color: #aaa;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.8rem;
+}
+
+.exit-voice-btn:hover {
+  color: white;
+}
+
+.pulse-icon {
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  50% {
+    transform: scale(1.2);
+    opacity: 0.8;
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Image Upload Styles */
+.icon-btn {
+  background: transparent;
+  border: none;
+  color: #aaa;
+  cursor: pointer;
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
+}
+
+.icon-btn:hover {
+  color: white;
+}
+
+.icon-btn.active {
+  color: #0575e6;
+}
+
+.image-preview-bar {
+  padding: 10px 15px;
+  background: rgba(0, 0, 0, 0.3);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.image-preview-bar img {
+  height: 40px;
+  border-radius: 4px;
+}
+
+.image-preview-bar .close-preview {
+  background: transparent;
+  border: none;
+  color: #ff4757;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+.message-image-preview {
+  max-width: 200px;
+  max-height: 200px;
+  border-radius: 12px;
+  margin-bottom: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.message-content-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.message-wrapper.user .message-content-col {
+  align-items: flex-end;
+}

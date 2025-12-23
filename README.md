@@ -1,38 +1,51 @@
-# ElectroShop Voice Bot
+# ElectroShop Omni-Channel Agent
 
-A real-time Voice AI Agent for taking electronics orders.
+A real-time AI Agent for taking electronics orders via Web (Text/Voice/Image), WhatsApp, and Phone Calls.
 
 ## Features
-- **Voice Interface**: Speak naturally to the agent.
-- **Inventory Search**: Real-time lookup from Google Sheets (or Mock Data).
-- **Cart Management**: Add multiple items, quantities.
-- **Order Placement**: Saves confirmed orders to Google Sheets.
+- **Active Listening (Voice Mode)**: Continuous, hands-free voice conversation loop (Web).
+- **Visual Intelligence**: Upload images of items for the agent to identify and search in inventory.
+- **Omni-Channel Support**:
+    - **Web**: Rich UI with Voice & Image support.
+    - **WhatsApp**: Text-based ordering via Twilio.
+    - **Phone**: Full voice conversational agent via Twilio Voice.
+- **Inventory & Orders**: Real-time read/write to Google Sheets.
 
 ## Setup
 
 ### 1. Prerequisites
-- **OpenAI API Key**: You need a key from [platform.openai.com](https://platform.openai.com).
-- **Google Sheets Credentials** (Optional for Demo):
-    - Create a Project in Google Cloud Console.
-    - Enable **Google Sheets API** and **Google Drive API**.
-    - Create a **Service Account** and download the JSON key.
-    - Rename it to `credentials.json` and place it in the `backend/` folder.
-    - Share your Inventory and Orders sheets with the Service Account email.
+- **OpenAI API Key**: Required for GPT-4o (Vision & Chat) and Whisper (STT).
+- **Twilio Account** (Optional): For WhatsApp and Phone integration.
+- **Google Sheets Credentials**:
+    - Place `credentials.json` in the `backend/` folder.
+    - Share your Sheets with the Service Account email.
 
 ### 2. Configuration
-1. Open `backend/.env` and paste your OpenAI API Key:
+1. **Environment Variables**:
+   Create `backend/.env`:
    ```bash
-   OPENAI_API_KEY=sk-proj-...
+   OPENAI_API_KEY=sk-...
    ```
-2. (Optional) If using real sheets, update `backend/sheets_manager.py` with your Sheet names if they are not "Inventory" and "Orders".
+2. **Install Dependencies**:
+
+   **Backend**:
+   ```bash
+   cd backend
+   pip install -r requirements.txt
+   ```
+
+   **Frontend**:
+   ```bash
+   cd frontend
+   npm install
+   ```
 
 ### 3. Run the Application
 
 **Terminal 1: Backend**
 ```bash
 cd backend
-source venv/bin/activate
-uvicorn main:app --reload
+uvicorn main:app --reload --port 8000
 ```
 
 **Terminal 2: Frontend**
@@ -41,4 +54,19 @@ cd frontend
 npm run dev
 ```
 
-Open the URL shown in Terminal 2 (usually `http://localhost:5173`) to interact with the bot.
+**Terminal 3: Tunnel (For WhatsApp/Voice)**
+```bash
+ngrok http 8000
+```
+
+### 4. Usage Drivers
+
+- **Web App**: Open `http://localhost:5173`.
+    - Click **Mic** for continuous voice chat.
+    - Click **Image Icon** to upload and query products visually.
+- **WhatsApp**: See [WHATSAPP_SETUP.md](./backend/WHATSAPP_SETUP.md).
+- **Phone Call**: See [VOICE_SETUP.md](./backend/VOICE_SETUP.md).
+
+## Project Structure
+- `backend/`: FastAPI server, AI Logic, Google Sheets integration.
+- `frontend/`: React app with Voice/Image UI components.

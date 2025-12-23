@@ -81,7 +81,7 @@ Your goal is to help customers place orders.
 8. Keep your responses concise and conversational (suitable for voice).
 """
 
-def get_agent_response(session_id, user_text):
+def get_agent_response(session_id, user_text, image_url=None):
     if session_id not in sessions:
         sessions[session_id] = {
             "history": [{"role": "system", "content": SYSTEM_PROMPT}],
@@ -89,7 +89,17 @@ def get_agent_response(session_id, user_text):
         }
     
     session = sessions[session_id]
-    session["history"].append({"role": "user", "content": user_text})
+    
+    if image_url:
+        # Multimodal message structure
+        content_payload = [
+            {"type": "text", "text": user_text or "Please look at this image and identify the items."},
+            {"type": "image_url", "image_url": {"url": image_url}}
+        ]
+        session["history"].append({"role": "user", "content": content_payload})
+    else:
+        # Standard text message
+        session["history"].append({"role": "user", "content": user_text})
 
     response = client.chat.completions.create(
         model="gpt-4o",

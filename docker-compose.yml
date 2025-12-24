@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    ports:
+      - "8080:8080"
+    env_file:
+      - ./backend/.env
+    volumes:
+      # Mount credentials if you prefer file-based auth locally
+      - ./backend/credentials.json:/app/backend/credentials.json
+      # Mount .env if needed for python-dotenv to read file directly, 
+      # but env_file handles the variables injection.
+      - ./backend/.env:/app/backend/.env

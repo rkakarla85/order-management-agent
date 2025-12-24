@@ -2,29 +2,72 @@ from openai import OpenAI
 import os
 import json
 from sheets_manager import SheetsManager
+from business_manager import BusinessManager
 from dotenv import load_dotenv
+from datetime import datetime
 
 load_dotenv()
 
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-sheets = SheetsManager()
+business_manager = BusinessManager()
 
-# Simple session state management (for demo purposes)
-# In production, use a database or Redis
+# Cache for SheetsManager instances to avoid reconnecting every time
+# Key: business_id, Value: SheetsManager instance
+sheet_instances = {}
+
+# Simple session state management
+# Key: session_id, Value: { history: [], cart: [], business_id: str }
 sessions = {}
+
+def get_sheets_manager(business_id):
+    if business_id in sheet_instances:
+        return sheet_instances[business_id]
+    
+    biz_config = business_manager.get_business(business_id)
+    if not biz_config:
+        print(f"Error: Business ID {business_id} not found.")
+        return None
+        
+    instance = SheetsManager(inventory_sheet_id=biz_config["sheet_id"])
+    sheet_instances[business_id] = instance
+    return instance
+
+from jinja2 import Environment, FileSystemLoader
+
+# ... (retain existing imports)
+
+# Setup Jinja2 Environment
+prompts_dir = os.path.join(os.path.dirname(__file__), 'prompts')
+jinja_env = Environment(loader=FileSystemLoader(prompts_dir))
+
+# ... (retain existing code up to get_system_prompt)
+
+def get_system_prompt(business_type, current_time=None):
+    try:
+        if business_type == "restaurant":
+            template = jinja_env.get_template('restaurant.j2')
+            return template.render(current_time=current_time)
+        else:
+            # Default Retail/Electronics
+            template = jinja_env.get_template('retail.j2')
+            return template.render()
+    except Exception as e:
+        print(f"Error loading prompt template: {e}")
+        # Fallback to a basic prompt if template loading fails
+        return "You are a helpful assistant."
 
 TOOLS = [
     {
         "type": "function",
         "function": {
             "name": "search_inventory",
-            "description": "Search for items in the inventory. Use this when the user asks for products.",
+            "description": "Search for items in the inventory/menu.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "query": {
                         "type": "string",
-                        "description": "The search query for the item (e.g., 'switch', 'fan')"
+                        "description": "The search query for the item"
                     }
                 },
                 "required": ["query"]
@@ -35,7 +78,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "add_to_cart",
-            "description": "Add items to the current order cart. Do NOT use this to confirm the order, just to build the list.",
+            "description": "Add items to the current order cart.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -45,7 +88,8 @@ TOOLS = [
                             "type": "object",
                             "properties": {
                                 "name": {"type": "string"},
-                                "quantity": {"type": "integer"}
+                                "quantity": {"type": "integer"},
+                                "notes": {"type": "string", "description": "Optional notes for customization (e.g. 'Spicy', 'No onions')"}
                             }
                         }
                     }
@@ -68,44 +112,36 @@ TOOLS = [
     }
 ]
 
-SYSTEM_PROMPT = """
-You are a helpful Voice Assistant for an electronics shop. 
-Your goal is to help customers place orders.
-1. Greet the customer and ask what they need.
-2. Search the inventory when they ask for items.
-3. If found, ask for quantity and add to cart.
-4. If not found, apologize.
-5. ALWAYS extract precise item names and quantities.
-6. Before placing the order, list the items in the cart and ask for confirmation.
-7. Only call 'confirm_and_place_order' when the user explicitly says "Yes" or "Confirm".
-8. Keep your responses concise and conversational (suitable for voice).
-9. **LANGUAGE SUPPORT**: Always reply in the same language the user speaks. Supports: English, Telugu, Kannada, Hindi.
-   - If user speaks Telugu, reply in Telugu.
-   - If user speaks Hindi, reply in Hindi.
-   - If user speaks Kannada, reply in Kannada.
-10. **SEARCH STRATEGY**: The inventory is in **ENGLISH**.
-    - If the user asks for an item in a regional language (e.g., "ఫ్యాన్" for Fan), you MUST translate the keyword to ENGLISH (e.g., "Fan") before calling `search_inventory`.
-    - Do NOT search using Telugu/Hindi script. Use English keywords only.
-"""
-
-def get_agent_response(session_id, user_text, image_url=None):
+def get_agent_response(session_id, user_text, image_url=None, business_id="electronics_default"):
+    # Initialize Session
     if session_id not in sessions:
+        biz_config = business_manager.get_business(business_id)
+        if not biz_config:
+            # Fallback
+            biz_config = {"type": "retail"}
+        
+        current_time_str = datetime.now().strftime("%H:%M")
+        system_prompt = get_system_prompt(biz_config["type"], current_time_str)
+        
         sessions[session_id] = {
-            "history": [{"role": "system", "content": SYSTEM_PROMPT}],
-            "cart": []
+            "history": [{"role": "system", "content": system_prompt}],
+            "cart": [],
+            "business_id": business_id
         }
     
     session = sessions[session_id]
     
+    # Ensure we use the correct Sheets instance for this session's business
+    current_biz_id = session.get("business_id", business_id)
+    sheets = get_sheets_manager(current_biz_id)
+    
     if image_url:
-        # Multimodal message structure
         content_payload = [
             {"type": "text", "text": user_text or "Please look at this image and identify the items."},
             {"type": "image_url", "image_url": {"url": image_url}}
         ]
         session["history"].append({"role": "user", "content": content_payload})
     else:
-        # Standard text message
         session["history"].append({"role": "user", "content": user_text})
 
     response = client.chat.completions.create(
@@ -118,36 +154,40 @@ def get_agent_response(session_id, user_text, image_url=None):
     msg = response.choices[0].message
     
     if msg.tool_calls:
-        session["history"].append(msg) # Add the assistant's tool call message
+        session["history"].append(msg)
         
         for tool_call in msg.tool_calls:
             fn_name = tool_call.function.name
             args = json.loads(tool_call.function.arguments)
-            
             result_content = ""
             
             if fn_name == "search_inventory":
-                results = sheets.search_inventory(args["query"])
-                if results:
-                    result_content = f"Found: {json.dumps(results)}"
+                if sheets:
+                    results = sheets.search_inventory(args["query"])
+                    if results:
+                        result_content = f"Found: {json.dumps(results)}"
+                    else:
+                        result_content = "No items found."
                 else:
-                    result_content = "No items found matching that query."
+                     result_content = "System Error: Inventory unavailable."
             
             elif fn_name == "add_to_cart":
                 items = args["items"]
                 session["cart"].extend(items)
-                result_content = f"Added {len(items)} items to cart. Current Cart: {json.dumps(session['cart'])}"
+                result_content = f"Added items. Current Cart: {json.dumps(session['cart'])}"
             
             elif fn_name == "confirm_and_place_order":
                 if not session["cart"]:
-                    result_content = "Cart is empty. cannot place order."
-                else:
+                    result_content = "Cart is empty."
+                elif sheets:
                     success = sheets.add_order({"items": session['cart']})
                     if success:
-                        result_content = "Order placed successfully in the system."
-                        session["cart"] = [] # Clear cart
+                        result_content = "Order placed successfully."
+                        session["cart"] = []
                     else:
-                        result_content = "Failed to place order due to system error."
+                        result_content = "Failed to place order."
+                else:
+                    result_content = "System Error: Order system unavailable."
 
             session["history"].append({
                 "role": "tool",
@@ -155,7 +195,6 @@ def get_agent_response(session_id, user_text, image_url=None):
                 "content": result_content
             })
         
-        # Get final response after tool execution
         final_response = client.chat.completions.create(
             model="gpt-4o",
             messages=session["history"]

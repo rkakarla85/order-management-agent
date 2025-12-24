@@ -1,0 +1,20 @@
+[
+    {
+        "id": "electronics_default",
+        "name": "ElectroShop Main",
+        "type": "retail",
+        "sheet_id": "1XdM-7X0wfzroeXil1c3NBbSxgv9hrtR7qFu4glMbi-M",
+        "config": {
+            "currency": "USD"
+        }
+    },
+    {
+        "id": "pizza_demo",
+        "name": "Luigi's Pizza",
+        "type": "restaurant",
+        "sheet_id": "1XdM-7X0wfzroeXil1c3NBbSxgv9hrtR7qFu4glMbi-M",
+        "config": {
+            "currency": "USD"
+        }
+    }
+]

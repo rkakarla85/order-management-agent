@@ -3,10 +3,17 @@ import axios from 'axios'
 import { Send, User, Bot, Loader2, Mic, MicOff, X, Volume2, Image as ImageIcon, Globe } from 'lucide-react'
 import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition'
 
-function ChatInterface({ sessionId }) {
+function ChatInterface({ sessionId, businessId, businessName }) {
     const [messages, setMessages] = useState([
-        { role: 'assistant', content: 'Hello! I am your Electronics Shop Assistant. How can I help you today?' }
+        { role: 'assistant', content: `Hello! Welcome to ${businessName}. I am your assistant. How can I help you today?` }
     ])
+
+    // Reset chat when business changes
+    useEffect(() => {
+        setMessages([
+            { role: 'assistant', content: `Hello! Welcome to ${businessName}. I am your assistant. How can I help you today?` }
+        ])
+    }, [businessName])
     const [inputText, setInputText] = useState('')
     const [isLoading, setIsLoading] = useState(false)
     const [isVoiceMode, setIsVoiceMode] = useState(false)
@@ -15,6 +22,7 @@ function ChatInterface({ sessionId }) {
     const [selectedImage, setSelectedImage] = useState(null)
     const [previewUrl, setPreviewUrl] = useState(null)
     const [language, setLanguage] = useState('en-US')
+    const [isStarting, setIsStarting] = useState(false)
     const fileInputRef = useRef(null)
 
     // Voice Recognition Hooks
@@ -22,7 +30,8 @@ function ChatInterface({ sessionId }) {
         transcript,
         listening,
         resetTranscript,
-        browserSupportsSpeechRecognition
+        browserSupportsSpeechRecognition,
+        isMicrophoneAvailable
     } = useSpeechRecognition()
 
     const messagesEndRef = useRef(null)
@@ -37,6 +46,22 @@ function ChatInterface({ sessionId }) {
     useEffect(() => {
         scrollToBottom()
     }, [messages, listening])
+
+    // Clear starting state when listening begins or after timeout
+    useEffect(() => {
+        let timeoutId;
+        if (listening && isStarting) {
+            setIsStarting(false)
+        } else if (isStarting && !listening) {
+            // Safety timeout: if checking permissions or starting takes too long
+            timeoutId = setTimeout(() => {
+                setIsStarting(false);
+            }, 5000);
+        }
+        return () => {
+            if (timeoutId) clearTimeout(timeoutId);
+        };
+    }, [listening, isStarting])
 
     // Handle Transcript Changes (Auto-submit logic)
     useEffect(() => {
@@ -89,10 +114,12 @@ function ChatInterface({ sessionId }) {
             const payload = {
                 message: text,
                 session_id: sessionId,
-                image: selectedImage
+                image: selectedImage,
+                business_id: businessId
             }
 
-            const chatRes = await axios.post('http://localhost:8000/chat', payload)
+            const API_URL = import.meta.env.PROD ? '' : 'http://localhost:8000';
+            const chatRes = await axios.post(`${API_URL}/chat`, payload)
             const aiText = chatRes.data.response
 
             setMessages(prev => [...prev, { role: 'assistant', content: aiText }])
@@ -111,7 +138,7 @@ function ChatInterface({ sessionId }) {
     const playTextToSpeech = async (text) => {
         try {
             setIsSpeaking(true)
-            const response = await axios.post('http://localhost:8000/tts', { text, language }, { responseType: 'blob' })
+            const response = await axios.post(`${import.meta.env.PROD ? '' : 'http://localhost:8000'}/tts`, { text, language }, { responseType: 'blob' })
             const url = URL.createObjectURL(response.data)
 
             if (audioUrl) URL.revokeObjectURL(audioUrl)
@@ -146,6 +173,7 @@ function ChatInterface({ sessionId }) {
 
         if (isVoiceMode) {
             setIsVoiceMode(false)
+            setIsStarting(false)
             SpeechRecognition.stopListening()
             if (audioPlayerRef.current) {
                 audioPlayerRef.current.pause()
@@ -153,6 +181,7 @@ function ChatInterface({ sessionId }) {
             }
         } else {
             setIsVoiceMode(true)
+            setIsStarting(true)
             resetTranscript()
             SpeechRecognition.startListening({ continuous: true, language: language })
         }
@@ -185,10 +214,12 @@ function ChatInterface({ sessionId }) {
         ])
 
         try {
-            const response = await axios.post('http://localhost:8000/chat', {
+            const API_URL = import.meta.env.PROD ? '' : 'http://localhost:8000';
+            const response = await axios.post(`${API_URL}/chat`, {
                 message: userMessage,
                 session_id: sessionId,
-                image: imageToSend
+                image: imageToSend,
+                business_id: businessId
             })
             setMessages(prev => [...prev, { role: 'assistant', content: response.data.response }])
         } catch (error) {
@@ -251,7 +282,16 @@ function ChatInterface({ sessionId }) {
             {/* Voice Mode Status */}
             {isVoiceMode && (
                 <div className="voice-status-bar">
-                    {isSpeaking ? (
+                    {!browserSupportsSpeechRecognition ? (
+                        <div className="status error">Browser not supported</div>
+                    ) : !isMicrophoneAvailable ? (
+                        <div className="status error">Mic access denied</div>
+                    ) : isStarting ? (
+                        <div className="status processing">
+                            <Loader2 className="spin" size={18} />
+                            <span>Connecting...</span>
+                        </div>
+                    ) : isSpeaking ? (
                         <div className="status speaking">
                             <Volume2 className="pulse-icon" size={18} />
                             <span>Speaking...</span>
@@ -268,7 +308,14 @@ function ChatInterface({ sessionId }) {
                             <div className="transcript-preview">{transcript}</div>
                         </div>
                     ) : (
-                        <div className="status">Paused</div>
+                        <button
+                            className="status"
+                            style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer' }}
+                            onClick={() => SpeechRecognition.startListening({ continuous: true, language: language })}
+                        >
+                            <MicOff size={18} />
+                            <span>Paused (Click to Resume)</span>
+                        </button>
                     )}
 
                     <button className="exit-voice-btn" onClick={toggleVoiceMode}>

@@ -355,3 +355,152 @@ footer {
   text-overflow: ellipsis;
   max-width: 200px;
 }
+
+/* Login Styles */
+.login-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  width: 100%;
+  background: radial-gradient(circle at 50% 10%, #1a1a2e, #16213e 40%, #000000);
+}
+
+.login-card {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 40px;
+  border-radius: 20px;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  max-width: 400px;
+  width: 90%;
+}
+
+.login-card h1 {
+  background: linear-gradient(90deg, #00f260, #0575e6);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 20px;
+  font-size: 2.5rem;
+}
+
+.login-card p {
+  color: #ccc;
+  margin-bottom: 30px;
+}
+
+.google-login-wrapper {
+  display: flex;
+  justify-content: center;
+}
+
+/* Header User Actions */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.user-greeting {
+  font-size: 0.9rem;
+  color: #fff;
+  font-weight: 500;
+}
+
+/* Button Styles */
+.admin-btn {
+  background: rgba(108, 92, 231, 0.2);
+  border: 1px solid rgba(108, 92, 231, 0.4);
+  color: #a29bfe;
+  border-radius: 8px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.admin-btn:hover {
+  background: rgba(108, 92, 231, 0.4);
+  color: #fff;
+  transform: translateY(-2px);
+}
+
+.dashboard-btn {
+  background: rgba(5, 117, 230, 0.1);
+  border: 1px solid rgba(5, 117, 230, 0.3);
+  color: #3a86ff;
+  border-radius: 8px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.dashboard-btn:hover {
+  background: rgba(5, 117, 230, 0.2);
+  color: #fff;
+  transform: translateY(-2px);
+}
+
+.logout-btn {
+  background: rgba(255, 71, 87, 0.1);
+  border: 1px solid rgba(255, 71, 87, 0.2);
+  color: #ff4757;
+  border-radius: 8px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+
+/* Business Selector */
+.business-selector {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  margin-top: 5px;
+}
+
+.business-selector select {
+  background: transparent;
+  border: none;
+  color: white;
+  outline: none;
+  font-size: 0.9rem;
+  cursor: pointer;
+  appearance: none;
+  padding-right: 10px;
+}
+
+.business-selector select option {
+  background: #1e1e1e;
+  color: white;
+}
+
+/* Status Badges */
+.status-badge.confirmed {
+  background: rgba(46, 213, 115, 0.2);
+  color: #2ed573;
+}
+
+.status-badge.pending {
+  background: rgba(255, 71, 87, 0.2);
+  color: #ff4757;
+}

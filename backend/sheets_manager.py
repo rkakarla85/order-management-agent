@@ -7,7 +7,7 @@ import json
 SCOPES = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 
 class SheetsManager:
-    def __init__(self, inventory_sheet_id="1XdM-7X0wfzroeXil1c3NBbSxgv9hrtR7qFu4glMbi-M", orders_sheet_name="Orders", creds_file="credentials.json"):
+    def __init__(self, inventory_sheet_id, orders_sheet_name="Orders", creds_file="credentials.json"):
         self.inventory_data = [] # Cache inventory
         self.creds_file = creds_file
         self.inventory_sheet_id = inventory_sheet_id
@@ -68,7 +68,13 @@ class SheetsManager:
             import traceback
             traceback.print_exc()
 
-    def search_inventory(self, query: str):
+    def search_inventory(self, query):
+        # Mock Inventory for Pizza Demo (to allow testing without a new Sheet)
+        if "pizza" in query.lower():
+            return [{"Item": "Pepperoni Pizza", "Price": "15.00", "Stock": "Unlimited"}]
+        if "pasta" in query.lower():
+             return [{"Item": "Spaghetti Carbonara", "Price": "12.00", "Stock": "Unlimited"}]
+
         print(f"DEBUG: Searching inventory for: '{query}'")
         # fuzzy search or simple checking
         query = query.lower()

@@ -2,17 +2,18 @@ import { useState, useEffect } from 'react'
 import axios from 'axios'
 import { Package, Clock, X } from 'lucide-react'
 
-function Dashboard({ onClose }) {
+function Dashboard({ onClose, businessId }) {
     const [orders, setOrders] = useState([])
     const [isLoading, setIsLoading] = useState(true)
 
     useEffect(() => {
         fetchOrders()
-    }, [])
+    }, [businessId])
 
     const fetchOrders = async () => {
         try {
-            const response = await axios.get('http://localhost:8000/orders')
+            const API_URL = import.meta.env.PROD ? '' : 'http://localhost:8000';
+            const response = await axios.get(`${API_URL}/orders?business_id=${businessId}`)
             setOrders(response.data)
         } catch (error) {
             console.error("Error fetching orders:", error)

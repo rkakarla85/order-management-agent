@@ -8,3 +8,4 @@ python-multipart
 requests
 twilio
 google-cloud-texttospeech
+jinja2

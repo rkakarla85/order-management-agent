@@ -9,3 +9,5 @@ requests
 twilio
 google-cloud-texttospeech
 jinja2
+chromadb
+pysqlite3-binary

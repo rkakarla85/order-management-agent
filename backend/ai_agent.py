@@ -24,8 +24,16 @@ def get_sheets_manager(business_id):
         return sheet_instances[business_id]
     
     biz_config = business_manager.get_business(business_id)
+    
+    # Synchronization fix: If not found, reload from disk because it might have been added by Admin API
     if not biz_config:
-        print(f"Error: Business ID {business_id} not found.")
+        print(f"Business {business_id} not found in memory. Reloading config...")
+        business_manager.businesses = business_manager._load_businesses()
+        biz_config = business_manager.get_business(business_id)
+        
+    if not biz_config:
+        print(f"Error: Business ID {business_id} not found even after reload.")
+        return None
         return None
         
     instance = SheetsManager(inventory_sheet_id=biz_config["sheet_id"])
@@ -56,65 +64,11 @@ def get_system_prompt(business_type, current_time=None):
         # Fallback to a basic prompt if template loading fails
         return "You are a helpful assistant."
 
-TOOLS = [
-    {
-        "type": "function",
-        "function": {
-            "name": "search_inventory",
-            "description": "Search for items in the inventory/menu.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "The search query for the item"
-                    }
-                },
-                "required": ["query"]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "add_to_cart",
-            "description": "Add items to the current order cart.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "items": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "name": {"type": "string"},
-                                "quantity": {"type": "integer"},
-                                "notes": {"type": "string", "description": "Optional notes for customization (e.g. 'Spicy', 'No onions')"}
-                            }
-                        }
-                    }
-                },
-                "required": ["items"]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "confirm_and_place_order",
-            "description": "Finalize and place the order after user confirmation.",
-            "parameters": {
-                "type": "object",
-                "properties": {},
-                "required": []
-            }
-        }
-    }
-]
+from tools_def import TOOLS
 
 def get_agent_response(session_id, user_text, image_url=None, business_id="electronics_default"):
-    # Initialize Session
-    if session_id not in sessions:
+    # Initialize or Reset Session
+    if session_id not in sessions or sessions[session_id].get("business_id") != business_id:
         biz_config = business_manager.get_business(business_id)
         if not biz_config:
             # Fallback
@@ -162,14 +116,29 @@ def get_agent_response(session_id, user_text, image_url=None, business_id="elect
             result_content = ""
             
             if fn_name == "search_inventory":
-                if sheets:
-                    results = sheets.search_inventory(args["query"])
-                    if results:
-                        result_content = f"Found: {json.dumps(results)}"
+                results = []
+                query = args["query"]
+                
+                # 1. Try Vector Search
+                try:
+                    if business_manager.vector_store:
+                        print(f"Attempting Vector Search for: {query}")
+                        results = business_manager.vector_store.search(query, current_biz_id)
+                except Exception as e:
+                    print(f"Vector search failed with error: {e}")
+                
+                # 2. Fallback to Keyword Search if Vector returned nothing or failed
+                if not results:
+                    print(f"Vector search yielded no results. Fallback to Keyword Search for: {query}")
+                    if sheets:
+                        results = sheets.search_inventory(query)
                     else:
-                        result_content = "No items found."
+                        print("Sheets manager unavailable for fallback.")
+
+                if results:
+                    result_content = f"Found: {json.dumps(results)}"
                 else:
-                     result_content = "System Error: Inventory unavailable."
+                    result_content = "No items found."
             
             elif fn_name == "add_to_cart":
                 items = args["items"]
